@@ -87,75 +87,133 @@ const sampleEnglishWords = {
   6: ["azured", "oceanic", "sunlit", "moonlit", "starlit", "wooded", "birdie", "aquatic", "flamed", "breezy", "rainy", "snowy", "rocky", "leafy", "rosy", "blued", "ruby", "golden", "frosty", "jeweled"],
 };
 
+// 한글 음절 생성 유틸리티
+function generateRandomSyllables(count: number): string[] {
+  // 한글 초성, 중성, 종성 정의
+  const initialConsonants = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+  const middleVowels = ["ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ", "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ"];
+  const finalConsonants = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+  
+  const result: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const chosung = initialConsonants[Math.floor(Math.random() * initialConsonants.length)];
+    const jungsung = middleVowels[Math.floor(Math.random() * middleVowels.length)];
+    const jongsung = Math.random() > 0.5 ? finalConsonants[Math.floor(Math.random() * finalConsonants.length)] : "";
+    
+    // 초성 인덱스 계산 (쌍자음 고려)
+    let chosungIndex = initialConsonants.indexOf(chosung);
+    if (chosungIndex === 1) chosungIndex = 0; // ㄲ -> ㄱ의 인덱스로 보정
+    if (chosungIndex === 4) chosungIndex = 3; // ㄸ -> ㄷ의 인덱스로 보정
+    if (chosungIndex === 8) chosungIndex = 7; // ㅃ -> ㅂ의 인덱스로 보정
+    if (chosungIndex === 10) chosungIndex = 9; // ㅆ -> ㅅ의 인덱스로 보정
+    if (chosungIndex === 13) chosungIndex = 12; // ㅉ -> ㅈ의 인덱스로 보정
+    
+    // 중성 인덱스 계산
+    let jungsungIndex = middleVowels.indexOf(jungsung);
+    
+    // 종성 인덱스 계산
+    let jongsungIndex = finalConsonants.indexOf(jongsung);
+    
+    // 한글 음절 유니코드 계산
+    // 한글 음절 = 0xAC00 + (초성 * 21 * 28) + (중성 * 28) + 종성
+    const charCode = 44032 + (chosungIndex * 21 * 28) + (jungsungIndex * 28) + jongsungIndex;
+    
+    result.push(String.fromCharCode(charCode));
+  }
+  return result;
+}
+
 // 직접 API 테스트를 위한 함수
 async function testDictionaryAPI() {
   console.log("테스트 시작: 국립국어원 API 직접 호출");
   
-  const term = "가";
-  const length = 2;
+  // 다양한 초성을 기반으로 한 테스트 시작 음절 생성
+  const initialSyllables = ["가", "나", "다", "메", "스", "헤", "아", "호"];
+  const testResults: Record<string, string[]> = {};
   
-  try {
-    const url = new URL(DICTIONARY_API_BASE_URL);
-    url.searchParams.set("key", DICTIONARY_API_KEY);
-    url.searchParams.set("q", term);
-    url.searchParams.set("req_type", "json");
-    url.searchParams.set("start", "1");
-    url.searchParams.set("num", "100");
-    url.searchParams.set("advanced", "y");
-    url.searchParams.set("method", "start"); // start로 시작하는 단어 검색
-    url.searchParams.set("type1", "word"); // 어휘만 검색 (구/관용구/속담 제외)
-    url.searchParams.set("pos", "1"); // 명사만 검색
-    url.searchParams.set("letter_s", length.toString());
-    url.searchParams.set("letter_e", length.toString());
-    url.searchParams.set("type2", "native,chinese"); // 고유어 + 한자어
-    
-    console.log(`API 요청 URL: ${url.toString()}`);
-    
-    const response = await fetch(url.toString(), {
-      headers: {
-        'User-Agent': 'MapleNicknameGenerator/1.0',
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      console.error(`API 에러: ${response.status} ${response.statusText}`);
-      return;
-    }
-    
-    const text = await response.text();
-    console.log(`응답 길이: ${text.length} 바이트`);
-    console.log(`응답 미리보기: ${text.substring(0, 1000)}...`);
+  for (const term of initialSyllables) {
+    const length = 3; // 테스트 길이 (2~6 사이 설정 가능)
     
     try {
-      const data = JSON.parse(text);
-      if (data.error) {
-        console.error(`API 에러: ${data.error.error_code} - ${data.error.message}`);
-      } else if (data.channel?.item) {
-        const items = Array.isArray(data.channel.item) ? data.channel.item : [data.channel.item];
-        console.log(`총 ${items.length}개 항목 찾음`);
-        
-        const words: string[] = [];
-        for (const item of items) {
-          if (item.word && item.word.length === length) {
-            if (/^[가-힣]+$/.test(item.word)) {
-              words.push(item.word);
+      console.log(`테스트 중: 시작 음절 "${term}", 길이 ${length}글자`);
+      
+      const url = new URL(DICTIONARY_API_BASE_URL);
+      url.searchParams.set("key", DICTIONARY_API_KEY);
+      url.searchParams.set("q", term);
+      url.searchParams.set("req_type", "json");
+      url.searchParams.set("start", "1");
+      url.searchParams.set("num", "100");
+      url.searchParams.set("advanced", "y");
+      url.searchParams.set("method", "start"); // start로 시작하는 단어 검색
+      url.searchParams.set("type1", "word"); // 어휘만 검색 (구/관용구/속담 제외)
+      url.searchParams.set("pos", "1"); // 명사만 검색
+      url.searchParams.set("letter_s", length.toString());
+      url.searchParams.set("letter_e", length.toString());
+      url.searchParams.set("type2", "native,chinese"); // 고유어 + 한자어
+      
+      console.log(`API 요청 URL: ${url.toString()}`);
+      
+      const response = await fetch(url.toString(), {
+        headers: {
+          'User-Agent': 'MapleNicknameGenerator/1.0',
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.error(`API 에러: ${response.status} ${response.statusText}`);
+        continue;
+      }
+      
+      const text = await response.text();
+      console.log(`응답 길이: ${text.length} 바이트`);
+      
+      try {
+        const data = JSON.parse(text);
+        if (data.error) {
+          console.error(`API 에러: ${data.error.error_code} - ${data.error.message}`);
+        } else if (data.channel?.item) {
+          const items = Array.isArray(data.channel.item) ? data.channel.item : [data.channel.item];
+          console.log(`총 ${items.length}개 항목 찾음`);
+          
+          const words: string[] = [];
+          for (const item of items) {
+            if (item.word && item.word.length === length) {
+              if (/^[가-힣]+$/.test(item.word) && item.word.length >= 2) {
+                words.push(item.word);
+              }
             }
           }
+          
+          console.log(`필터링 후 ${words.length}개 단어 남음`);
+          testResults[term] = words;
+          console.log(words.slice(0, 10)); // 처음 10개만 표시
+        } else {
+          console.log("검색 결과 없음");
         }
-        
-        console.log(`필터링 후 ${words.length}개 단어 남음:`);
-        console.log(words);
-      } else {
-        console.log("검색 결과 없음");
+      } catch (error) {
+        console.error("JSON 파싱 에러:", error);
       }
+      
+      // 다음 API 호출 전 짧은 지연
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
     } catch (error) {
-      console.error("JSON 파싱 에러:", error);
+      console.error("API 호출 에러:", error);
     }
-  } catch (error) {
-    console.error("API 호출 에러:", error);
   }
+  
+  // 전체 테스트 결과 요약
+  console.log("\n=== 테스트 결과 요약 ===");
+  for (const term in testResults) {
+    console.log(`시작 음절 "${term}": ${testResults[term].length}개 단어 찾음`);
+  }
+  
+  // 무작위 생성 함수 테스트
+  console.log("\n=== 무작위 한글 음절 생성 테스트 ===");
+  const randomSyllables = generateRandomSyllables(10);
+  console.log(`생성된 10개 무작위 음절: ${randomSyllables.join(', ')}`);
 }
 
 // 스크립트가 직접 실행될 때 API 테스트 실행
@@ -185,37 +243,89 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
   // For Korean words, try to use the actual dictionary API
   try {
     const words: string[] = [];
-    const maxResults = 1000; // Get more results to filter by length
+    const maxResults = 2000; // 더 많은 결과를 가져와서 다양성 확보
     
-    // Common Korean syllables and particles to search for words
-    const initialConsonants = ["ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
-    const middleVowels = ["ㅏ", "ㅑ", "ㅓ", "ㅕ", "ㅗ", "ㅛ", "ㅜ", "ㅠ", "ㅡ", "ㅣ", "ㅐ", "ㅒ", "ㅔ", "ㅖ", "ㅘ", "ㅙ", "ㅚ", "ㅝ", "ㅞ", "ㅟ", "ㅢ"];
+    // 한글 초성, 중성, 종성 정의
+    const initialConsonants = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+    const middleVowels = ["ㅏ", "ㅐ", "ㅑ", "ㅒ", "ㅓ", "ㅔ", "ㅕ", "ㅖ", "ㅗ", "ㅘ", "ㅙ", "ㅚ", "ㅛ", "ㅜ", "ㅝ", "ㅞ", "ㅟ", "ㅠ", "ㅡ", "ㅢ", "ㅣ"];
+    const finalConsonants = ["", "ㄱ", "ㄲ", "ㄳ", "ㄴ", "ㄵ", "ㄶ", "ㄷ", "ㄹ", "ㄺ", "ㄻ", "ㄼ", "ㄽ", "ㄾ", "ㄿ", "ㅀ", "ㅁ", "ㅂ", "ㅄ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
     
-    // 모든 가능한 첫 글자 조합 생성 (초성 + 중성)
+    // 더 다양한 검색 조합을 위한 탐색 전략
     const searchTerms: string[] = [];
     
-    // 기본 첫 글자 (가-하) 외에도 더 많은 조합 추가
-    initialConsonants.forEach(consonant => {
-      middleVowels.slice(0, 8).forEach(vowel => { // 더 많은 모음 조합 사용
+    // 전략 1: 완전 랜덤 음절 생성 (초성 + 중성 + 종성)
+    const generateRandomSyllables = (count: number) => {
+      const result: string[] = [];
+      for (let i = 0; i < count; i++) {
+        const chosung = initialConsonants[Math.floor(Math.random() * initialConsonants.length)];
+        const jungsung = middleVowels[Math.floor(Math.random() * middleVowels.length)];
+        const jongsung = Math.random() > 0.5 ? finalConsonants[Math.floor(Math.random() * finalConsonants.length)] : "";
+        
+        // 초성 인덱스 계산 (쌍자음 고려)
+        let chosungIndex = initialConsonants.indexOf(chosung);
+        if (chosungIndex === 1) chosungIndex = 0; // ㄲ -> ㄱ의 인덱스로 보정
+        if (chosungIndex === 4) chosungIndex = 3; // ㄸ -> ㄷ의 인덱스로 보정
+        if (chosungIndex === 8) chosungIndex = 7; // ㅃ -> ㅂ의 인덱스로 보정
+        if (chosungIndex === 10) chosungIndex = 9; // ㅆ -> ㅅ의 인덱스로 보정
+        if (chosungIndex === 13) chosungIndex = 12; // ㅉ -> ㅈ의 인덱스로 보정
+        
+        // 중성 인덱스 계산 (복합 모음 고려)
+        let jungsungIndex = middleVowels.indexOf(jungsung);
+        
+        // 종성 인덱스 계산
+        let jongsungIndex = finalConsonants.indexOf(jongsung);
+        
+        // 한글 음절 유니코드 계산
+        // 한글 음절 = 0xAC00 + (초성 * 21 * 28) + (중성 * 28) + 종성
+        const charCode = 44032 + (chosungIndex * 21 * 28) + (jungsungIndex * 28) + jongsungIndex;
+        
+        result.push(String.fromCharCode(charCode));
+      }
+      return result;
+    };
+    
+    // 전략 2: 자주 사용되는 초성 기반 음절 생성
+    const commonInitials = ["ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅎ"];
+    commonInitials.forEach(consonant => {
+      // 모든 중성과 조합
+      middleVowels.forEach(vowel => {
         // 초성과 중성을 결합하여 실제 한글 음절로 변환
-        const charCode = 44032 + 
-                        (initialConsonants.indexOf(consonant) * 588) + 
-                        (middleVowels.indexOf(vowel) * 28);
-        searchTerms.push(String.fromCharCode(charCode));
+        const chosungIndex = initialConsonants.indexOf(consonant);
+        const jungsungIndex = middleVowels.indexOf(vowel);
+        
+        // 각 초성-중성 조합에 대해 두 가지 버전 생성 (종성 있는 버전과 없는 버전)
+        const baseCharCode = 44032 + (chosungIndex * 21 * 28) + (jungsungIndex * 28);
+        searchTerms.push(String.fromCharCode(baseCharCode)); // 종성 없는 버전
+        
+        // 가장 흔한 종성 중 하나를 랜덤하게 추가 ("ㄱ", "ㄴ", "ㄹ", "ㅁ", "ㅂ", "ㅇ")
+        const commonFinals = [1, 4, 8, 16, 17, 21]; // 해당 종성들의 인덱스
+        const randomFinalIndex = commonFinals[Math.floor(Math.random() * commonFinals.length)];
+        searchTerms.push(String.fromCharCode(baseCharCode + randomFinalIndex));
       });
     });
     
-    // 추가로 특정 유용한 시작 음절 직접 추가
-    const additionalTerms = ["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하", 
-                            "그", "느", "드", "르", "므", "브", "스", "으", "즈", "츠", "크", "트", "프", "흐",
-                            "기", "니", "디", "리", "미", "비", "시", "이", "지", "치", "키", "티", "피", "히",
-                            // 메이플스토리 관련 검색어 추가
-                            "메", "헤", "스", "엘", "아", "보", "용", "검", "빛", "어", "루", "던", "힘", "눈", "해",
-                            "무", "영", "전", "소", "불", "얼", "바", "룬", "몬", "신", "팬", "숲", "귀", "음",
-                            // 현재 시간으로 랜덤 변수 추가
-                            "초", "황", "화", "동", "퀴", "철", "금", "목", "논", "산", "교", "장", "제", "개", "밑",
-                            "큰", "작", "긴", "짧", "깊", "높", "낮", "멀", "빠", "느", "럭", "덱", "럭"];
-    searchTerms.push(...additionalTerms);
+    // 전략 3: 빈도가 높은 음절 명시적 추가
+    const additionalTerms = [
+      // 기본 시작 음절 (가나다라마바사 등)
+      "가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하", 
+      // 자주 사용되는 음절 (그느드르 등)
+      "그", "느", "드", "르", "므", "브", "스", "으", "즈", "츠", "크", "트", "프", "흐",
+      "기", "니", "디", "리", "미", "비", "시", "이", "지", "치", "키", "티", "피", "히",
+      // 메이플스토리 관련 검색어
+      "메", "헤", "스", "엘", "아", "보", "용", "검", "빛", "어", "루", "던", "힘", "눈", "해",
+      "무", "영", "전", "소", "불", "얼", "바", "룬", "몬", "신", "팬", "숲", "귀", "음",
+      // 게임 관련 유용한 시작 음절
+      "강", "마", "성", "전", "황", "빙", "호", "서", "격", "여", "새", "돌", "칼", "활", "궁",
+      "폭", "진", "쿨", "럭", "슬", "포", "패", "로", "파", "쉐", "블", "스", "썬", "썸", "해",
+      // 숫자/컴퓨터 용어 관련
+      "백", "천", "만", "억", "조", "키", "코", "픽", "셀", "윈", "넷", "핫", "랭", "순", "위"
+    ];
+    
+    // 전략 4: 완전 랜덤 생성 음절 추가 (매번 다른 결과)
+    const randomSyllables = generateRandomSyllables(100);
+    
+    // 모든 전략의 결과 합치기
+    searchTerms.push(...additionalTerms, ...randomSyllables);
     
     // 중복 제거
     const uniqueTerms = [...new Set(searchTerms)];
@@ -228,11 +338,33 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
       [shuffledTerms[i], shuffledTerms[j]] = [shuffledTerms[j], shuffledTerms[i]];
     }
     
-    // 더 많은 검색어를 사용하여 다양성 확보 (매번 다른 개수 사용)
-    const termCount = Math.floor(Math.random() * 10) + 8; // 8~18개 사이 랜덤 (성능 최적화)
+    // 다양성을 위해 더 많은 검색어 사용 (매번 다른 양 사용)
+    const termCount = Math.floor(Math.random() * 15) + 15; // 15~30개 사이 랜덤
     const selectedTerms = shuffledTerms.slice(0, termCount);
     
-    // Get words from multiple search terms
+    // 다양한 전략의 검색 방법 정의
+    const searchMethods = [
+      // 기본 검색 방법
+      { method: "start", weight: 0.4 },   // 검색어로 시작하는 단어 (40% 확률)
+      { method: "exact", weight: 0.2 },   // 검색어와 정확히 일치하는 단어 (20% 확률)
+      { method: "include", weight: 0.4 }  // 검색어를 포함하는 단어 (40% 확률)
+    ];
+    
+    // 동적 검색 전략을 위한 포지션 코드
+    const positionCodes = [
+      { code: "1", name: "명사", weight: 0.7 },    // 명사 (70% 확률)
+      { code: "2", name: "동사", weight: 0.15 },   // 동사 (15% 확률)
+      { code: "5", name: "형용사", weight: 0.1 },  // 형용사 (10% 확률)
+      { code: "3", name: "부사", weight: 0.05 }    // 부사 (5% 확률)
+    ];
+    
+    // 다양한 API 호출 패턴을 사용하기 위한 설정
+    const apiCallOptions = {
+      starts: [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50],  // 다양한 시작점
+      counts: [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150]  // 다양한 요청 수
+    };
+    
+    // 각 검색어에 대해 다른 전략 적용하여 API 호출
     for (const term of selectedTerms) {
       try {
         const url = new URL(DICTIONARY_API_BASE_URL);
@@ -240,45 +372,68 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         url.searchParams.set("q", term);
         url.searchParams.set("req_type", "json");
         
-        // 매 호출마다 다른 시작점을 사용하여 다양한 결과 얻기
-        // 국립국어원 API는 결과가 많을 경우 페이징 처리를 함
-        const randomStart = Math.floor(Math.random() * 30) + 1; // 1~30 사이의 랜덤 시작점
-        url.searchParams.set("start", randomStart.toString());
+        // 다양한 시작점 설정 (매 호출마다 다름)
+        const randomStartIndex = Math.floor(Math.random() * apiCallOptions.starts.length);
+        const start = apiCallOptions.starts[randomStartIndex];
+        url.searchParams.set("start", start.toString());
         
-        // 매 호출마다 다른 개수 요청
-        const randomCount = Math.floor(Math.random() * 30) + 80; // 80~110 사이 랜덤 개수
-        url.searchParams.set("num", randomCount.toString());
+        // 다양한 개수 요청 (매 호출마다 다름)
+        const randomCountIndex = Math.floor(Math.random() * apiCallOptions.counts.length);
+        const count = apiCallOptions.counts[randomCountIndex];
+        url.searchParams.set("num", count.toString());
         
         url.searchParams.set("advanced", "y");
         
-        // 매 호출마다 다른 검색 방법을 사용하여 다양한 결과 얻기
-        const searchMethods = ["start", "exact", "include"];
-        const randomMethod = searchMethods[Math.floor(Math.random() * searchMethods.length)]; // 모든 방법 중 랜덤 선택
-        url.searchParams.set("method", randomMethod);
+        // 가중치 기반으로 검색 방법 선택
+        const randomValue = Math.random();
+        let cumulativeWeight = 0;
+        let selectedMethod = searchMethods[0].method;
         
-        // 검색 카테고리 랜덤 선택 (품사)
-        url.searchParams.set("type1", "word"); // 어휘만 검색 (구/관용구/속담 제외)
-        
-        // 다양한 품사 검색을 위한 랜덤 선택
-        const posCodes = ["1", "2"]; // 1: 명사, 2: 동사
-        if(Math.random() > 0.7) { // 30%의 확률로 동사도 포함
-          url.searchParams.set("pos", posCodes[Math.floor(Math.random() * posCodes.length)]);
-        } else {
-          url.searchParams.set("pos", "1"); // 기본값은 명사
+        for (const method of searchMethods) {
+          cumulativeWeight += method.weight;
+          if (randomValue <= cumulativeWeight) {
+            selectedMethod = method.method;
+            break;
+          }
         }
+        url.searchParams.set("method", selectedMethod);
+        
+        // 어휘만 검색 (구/관용구/속담 제외)
+        url.searchParams.set("type1", "word");
+        
+        // 가중치 기반으로 품사 선택
+        const positionRandom = Math.random();
+        let positionCumulativeWeight = 0;
+        let selectedPosition = positionCodes[0].code;
+        
+        for (const position of positionCodes) {
+          positionCumulativeWeight += position.weight;
+          if (positionRandom <= positionCumulativeWeight) {
+            selectedPosition = position.code;
+            break;
+          }
+        }
+        url.searchParams.set("pos", selectedPosition);
+        
+        // 글자 길이 설정
         url.searchParams.set("letter_s", length.toString());
         url.searchParams.set("letter_e", length.toString());
         
-        // Set type based on parameter
+        // 단어 유형 설정 (parameter 기반)
         if (type === "pure") {
           url.searchParams.set("type2", "native"); // 고유어
         } else if (type === "korean") {
-          url.searchParams.set("type2", "native,chinese"); // 고유어 + 한자어
+          // 한자어와 고유어 랜덤 비율 결정
+          if (Math.random() > 0.3) {
+            url.searchParams.set("type2", "native,chinese"); // 70% 확률로 고유어 + 한자어
+          } else {
+            url.searchParams.set("type2", "native"); // 30% 확률로 고유어만
+          }
         }
         
         console.log(`Fetching from dictionary API: ${url.toString()}`);
         
-        // 국립국어원 API 호출
+        // 국립국어원 API 호출 (병렬 처리를 위한 Promise 기반)
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃 (성능 최적화)
         
@@ -299,8 +454,6 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         }
         
         const text = await response.text();
-        console.log(`Dictionary response length: ${text.length}`);
-        console.log(`Dictionary response preview: ${text.substring(0, 200)}...`);
         
         let data: DictionaryResponse;
         
@@ -308,7 +461,6 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
           data = JSON.parse(text);
         } catch (parseError) {
           console.error('JSON parse error:', parseError);
-          console.error('Response text:', text.substring(0, 500));
           continue;
         }
         
@@ -319,32 +471,35 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         }
         
         if (data.channel?.item) {
-          console.log(`Found ${Array.isArray(data.channel.item) ? data.channel.item.length : 1} items for term "${term}"`);
-          
           // API가 단일 항목일 경우 배열로 변환
           const items = Array.isArray(data.channel.item) ? data.channel.item : [data.channel.item];
           
           for (const item of items) {
+            // 단어가 있고, 요청한 길이와 일치하는지 확인
             if (item.word && item.word.length === length) {
-              // 단어만 필터링 (숫자나 특수문자 제외)
+              // 한글 문자만 포함하는지 확인 (숫자, 특수문자 제외)
               if (/^[가-힣]+$/.test(item.word)) {
-                // 최소 길이 검사 (메이플스토리에서는 1글자 닉네임 불가)
+                // 최소 2글자 이상인지 확인 (메이플스토리 1글자 닉네임 제한)
                 if (item.word.length >= 2) {
-                  console.log(`Adding word: ${item.word}`);
-                  words.push(item.word);
+                  // 중복 확인 (이미 추가된 단어는 다시 추가하지 않음)
+                  if (!words.includes(item.word)) {
+                    words.push(item.word);
+                  }
                 }
               }
             }
           }
-        } else {
-          console.log(`No items found for term "${term}"`);
         }
         
-        // Break if we have enough words
-        if (words.length >= maxResults) break;
+        // 충분한 단어를 찾았으면 중단
+        if (words.length >= maxResults) {
+          console.log(`Reached maximum results limit (${maxResults}), stopping search`);
+          break;
+        }
         
-        // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 50)); // 50ms 지연 (성능 최적화)
+        // API 호출 간 지연 시간을 랜덤화하여 다양성 증가
+        const delay = Math.floor(Math.random() * 50) + 30; // 30~80ms 랜덤 지연
+        await new Promise(resolve => setTimeout(resolve, delay));
         
       } catch (error) {
         console.error(`Error fetching from dictionary API with term ${term}:`, error);
@@ -354,24 +509,67 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
     
     console.log(`Total words found: ${words.length}`);
     
-    // If we couldn't get enough words from the API, use sample data
-    if (words.length < 10) {
-      console.warn(`Not enough words found via API (${words.length}), using sample data`);
-      return sampleKoreanWords[length as keyof typeof sampleKoreanWords] || [];
+    // API에서 충분한 단어를 찾지 못한 경우, 샘플 데이터로 보완
+    if (words.length < 20) {
+      console.warn(`Not enough words found via API (${words.length}), supplementing with sample data`);
+      const sampleWords = sampleKoreanWords[length as keyof typeof sampleKoreanWords] || [];
+      
+      // 기존 단어와 중복되지 않는 샘플 단어만 추가
+      for (const word of sampleWords) {
+        if (!words.includes(word)) {
+          words.push(word);
+        }
+      }
+      
+      console.log(`After supplementing: ${words.length} words`);
     }
     
-    // Remove duplicates
+    // 중복 제거 (Set 활용)
     const uniqueWords = [...new Set(words)];
     console.log(`After removing duplicates: ${uniqueWords.length} unique words`);
     
-    // 더 철저한 셔플 알고리즘 적용 (Fisher-Yates 알고리즘)
-    for (let i = uniqueWords.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [uniqueWords[i], uniqueWords[j]] = [uniqueWords[j], uniqueWords[i]];
-    }
+    // 철저한 무작위화를 위한 다중 셔플 알고리즘 적용
+    const multiShuffleArray = (array: string[]): string[] => {
+      // Fisher-Yates 셔플
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      
+      // 추가 셔플을 위한 분할 및 재결합
+      const halfPoint = Math.floor(shuffled.length / 2);
+      const firstHalf = shuffled.slice(0, halfPoint);
+      const secondHalf = shuffled.slice(halfPoint);
+      
+      // 각 절반을 독립적으로 다시 셔플
+      for (let i = firstHalf.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [firstHalf[i], firstHalf[j]] = [firstHalf[j], firstHalf[i]];
+      }
+      
+      for (let i = secondHalf.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [secondHalf[i], secondHalf[j]] = [secondHalf[j], secondHalf[i]];
+      }
+      
+      // 재결합 (교차 방식으로)
+      const result: string[] = [];
+      const maxLength = Math.max(firstHalf.length, secondHalf.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        if (i < firstHalf.length) result.push(firstHalf[i]);
+        if (i < secondHalf.length) result.push(secondHalf[i]);
+      }
+      
+      return result;
+    };
     
-    console.log(`Returning ${uniqueWords.length} thoroughly shuffled unique words`);
-    return uniqueWords;
+    // 다중 셔플 알고리즘 적용
+    const thoroughlyShuffledWords = multiShuffleArray(uniqueWords);
+    
+    console.log(`Returning ${thoroughlyShuffledWords.length} thoroughly shuffled unique words`);
+    return thoroughlyShuffledWords;
     
   } catch (error) {
     console.error("Dictionary API error:", error);
@@ -462,22 +660,64 @@ export const handler: Handler = async (event, context) => {
     const filteredWords = words.filter(word => word && word.length >= 2);
     console.log(`Filtered out ${words.length - filteredWords.length} words with less than 2 characters`);
     
-    const limited = filteredWords.slice(0, count);
+    // 다중 셔플 알고리즘 적용 (완전한 무작위성 보장)
+    const multiShuffleArray = (array: string[]): string[] => {
+      // Fisher-Yates 셔플
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      
+      // 추가 셔플을 위한 분할 및 재결합
+      const chunkSize = Math.ceil(shuffled.length / 4);
+      const chunks: string[][] = [];
+      
+      for (let i = 0; i < shuffled.length; i += chunkSize) {
+        chunks.push(shuffled.slice(i, i + chunkSize));
+      }
+      
+      // 각 청크를 독립적으로 다시 셔플
+      chunks.forEach(chunk => {
+        for (let i = chunk.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
+        }
+      });
+      
+      // 청크 순서도 셔플
+      for (let i = chunks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [chunks[i], chunks[j]] = [chunks[j], chunks[i]];
+      }
+      
+      // 재결합
+      return chunks.flat();
+    };
     
-    // 실시간으로 생성된 무작위 타임스탬프 추가
-    const timestamp = Date.now() + Math.floor(Math.random() * 10000).toString();
+    // 다중 셔플 적용
+    const thoroughlyShuffledWords = multiShuffleArray(filteredWords);
+    
+    // 결과 제한
+    const limited = thoroughlyShuffledWords.slice(0, count);
+    
+    // 랜덤 요소 추가를 위한 타임스탬프 생성 (나노초 정밀도 모방)
+    const timestamp = Date.now() * 1000 + Math.floor(Math.random() * 1000);
+    const randomSeed = Math.floor(Math.random() * 100000000).toString();
     
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         words: limited,
-        total: filteredWords.length,
+        total: thoroughlyShuffledWords.length,
         returned: limited.length,
         length,
         type,
         timestamp: new Date().toISOString(),
-        random: timestamp // 무작위성을 높이기 위한 추가 필드
+        random: timestamp.toString(), 
+        seed: randomSeed,
+        source: thoroughlyShuffledWords.length > 20 ? "api" : "mixed"
       }),
     };
   } catch (error) {

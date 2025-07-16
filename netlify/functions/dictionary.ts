@@ -169,6 +169,12 @@ if (typeof require !== 'undefined' && require.main === module) {
 async function fetchFromDictionaryAPI(length: number, type: string): Promise<string[]> {
   console.log(`Fetching dictionary words: length=${length}, type=${type}`);
   
+  // 메이플스토리에서는 1글자 닉네임이 불가능하므로 2글자 미만 요청 거부
+  if (length < 2) {
+    console.warn(`Rejecting request for ${length} character words (minimum is 2)`);
+    return [];
+  }
+  
   // For english words, return sample data
   if (type === "english") {
     const words = sampleEnglishWords[length as keyof typeof sampleEnglishWords] || [];
@@ -322,8 +328,11 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
             if (item.word && item.word.length === length) {
               // 단어만 필터링 (숫자나 특수문자 제외)
               if (/^[가-힣]+$/.test(item.word)) {
-                console.log(`Adding word: ${item.word}`);
-                words.push(item.word);
+                // 최소 길이 검사 (메이플스토리에서는 1글자 닉네임 불가)
+                if (item.word.length >= 2) {
+                  console.log(`Adding word: ${item.word}`);
+                  words.push(item.word);
+                }
               }
             }
           }
@@ -406,11 +415,15 @@ export const handler: Handler = async (event, context) => {
   const type = params.type || 'korean';
   const count = parseInt(params.count || '100');
 
+  // 메이플스토리에서는 한 글자 닉네임이 존재하지 않으므로 최소 2글자 이상이어야 함
   if (length < 2 || length > 6) {
     return {
       statusCode: 400,
       headers,
-      body: JSON.stringify({ error: 'Length must be between 2 and 6' }),
+      body: JSON.stringify({ 
+        error: length < 2 ? 'Length must be at least 2' : 'Length must be at most 6',
+        message: length < 2 ? '메이플스토리 닉네임은 최소 2글자 이상이어야 합니다.' : '메이플스토리 닉네임은 최대 6글자까지 가능합니다.' 
+      }),
     };
   }
 
@@ -445,7 +458,11 @@ export const handler: Handler = async (event, context) => {
       [words[i], words[j]] = [words[j], words[i]];
     }
     
-    const limited = words.slice(0, count);
+    // 최종 필터링: 1글자 단어는 절대 포함되지 않도록 한번 더 확인
+    const filteredWords = words.filter(word => word && word.length >= 2);
+    console.log(`Filtered out ${words.length - filteredWords.length} words with less than 2 characters`);
+    
+    const limited = filteredWords.slice(0, count);
     
     // 실시간으로 생성된 무작위 타임스탬프 추가
     const timestamp = Date.now() + Math.floor(Math.random() * 10000).toString();
@@ -455,7 +472,7 @@ export const handler: Handler = async (event, context) => {
       headers,
       body: JSON.stringify({
         words: limited,
-        total: words.length,
+        total: filteredWords.length,
         returned: limited.length,
         length,
         type,

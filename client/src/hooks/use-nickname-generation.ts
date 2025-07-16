@@ -14,6 +14,17 @@ export function useNicknameGeneration() {
       console.log('Starting nickname generation with options:', options);
       const { length, count, useRealWords, wordType, excludeFinalConsonants, specificInitial } = options;
 
+      // 1글자 닉네임 방지
+      if (length < 2) {
+        console.error('닉네임 길이는 최소 2글자 이상이어야 합니다.');
+        toast({
+          title: "생성 오류",
+          description: "메이플스토리에서 닉네임은 최소 2글자 이상이어야 합니다.",
+          variant: "destructive",
+        });
+        return [];
+      }
+
       let candidates: string[] = [];
 
       if (useRealWords) {

@@ -9,7 +9,7 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
-    "copy-favicon": "powershell -Command \"Copy-Item -Path dist/public/favicon.png -Destination dist/public/favicon.ico -Force\""
+    "copy-favicon": "node copy-favicon.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

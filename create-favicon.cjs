@@ -1,6 +1,7 @@
 // This is a base64 encoded simple favicon
 // You can replace this with an actual favicon file later
 const fs = require('fs');
+const path = require('path');
 
 const faviconBase64 = `
 iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACx
@@ -26,10 +27,46 @@ LUHzlBuVz3nKeYUZMKvV9TfOWzBNc+T06dMvbdxqXQQopWxubi7Eq/w5Pij2cd8jNtchzWZz19TU
 1BGbaxVdIXjttVd4KsYo43uw02aMvXT8+LHvbK7/LAB+A2BzjHy8UfluAAAAAElFTkSuQmCC
 `;
 
+// Determine directories
+const clientPublicDir = path.join(__dirname, 'client', 'public');
+const distPublicDir = path.join(__dirname, 'dist', 'public');
+
+// Ensure directories exist
+try {
+  if (!fs.existsSync(clientPublicDir)) {
+    fs.mkdirSync(clientPublicDir, { recursive: true });
+  }
+  
+  if (!fs.existsSync(distPublicDir)) {
+    try {
+      fs.mkdirSync(distPublicDir, { recursive: true });
+    } catch (err) {
+      console.error('Could not create dist/public directory, might not be needed in this environment');
+    }
+  }
+} catch (err) {
+  console.error('Error creating directories:', err);
+}
+
 // Convert base64 to binary
 const binaryString = Buffer.from(faviconBase64.replace(/\s/g, ''), 'base64');
 
-// Write to file
-fs.writeFileSync('client/public/favicon.png', binaryString);
-
-console.log('Favicon created successfully!');
+// Write to client/public directory
+try {
+  fs.writeFileSync(path.join(clientPublicDir, 'favicon.png'), binaryString);
+  fs.writeFileSync(path.join(clientPublicDir, 'favicon.ico'), binaryString);
+  console.log('Favicon created successfully in client/public directory!');
+  
+  // Also write to dist/public if it exists (for production builds)
+  try {
+    if (fs.existsSync(distPublicDir)) {
+      fs.writeFileSync(path.join(distPublicDir, 'favicon.png'), binaryString);
+      fs.writeFileSync(path.join(distPublicDir, 'favicon.ico'), binaryString);
+      console.log('Favicon also copied to dist/public directory!');
+    }
+  } catch (err) {
+    console.error('Error writing to dist/public:', err);
+  }
+} catch (err) {
+  console.error('Error writing favicon:', err);
+}

@@ -6,10 +6,19 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetries = 3): Promise<"free" | "busy" | "error"> {
   console.log(`Checking nickname: ${nickname}`);
   
+  // 메이플스토리에서는 한 글자 닉네임이 존재하지 않음
+  if (nickname.length < 2) {
+    console.log(`Nickname ${nickname} is too short (minimum 2 characters required)`);
+    return "busy"; // 사용 불가로 처리
+  }
+  
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       // 닉네임을 UTF-8로 정확하게 인코딩
       const encodedName = encodeURIComponent(nickname);
+      
+      // 메이플스토리 API 문서 기반 (캐릭터 ID 조회 API 사용)
+      // API 문서: https://openapi.nexon.com/game/maplestory/character/basic
       const url = `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodedName}`;
       console.log(`Attempt ${attempt + 1} for ${nickname}: ${url}`);
       
@@ -22,30 +31,39 @@ async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetri
       });
 
       console.log(`Response status for ${nickname}: ${response.status}`);
+      
+      // 응답 본문 (디버깅용)
+      let responseBody = '';
+      try {
+        responseBody = await response.text();
+        console.log(`Response body for ${nickname}: ${responseBody}`);
+      } catch (e) {
+        console.error(`Failed to read response body: ${e}`);
+      }
 
+      // 캐릭터 닉네임 가용성 확인 로직
       if (response.status === 200) {
-        const data = await response.json();
-        console.log(`Response data for ${nickname}:`, data);
-        // ocid가 있으면 캐릭터가 존재함 - 닉네임 사용 중
-        if (data.ocid) {
+        // 200 응답은 캐릭터가 존재한다는 의미
+        try {
+          const data = JSON.parse(responseBody);
           console.log(`Character exists for ${nickname}, ocid: ${data.ocid}`);
-          return "busy";
-        } else {
-          console.log(`No ocid found for ${nickname} - free`);
-          return "free";
+          return "busy"; // 캐릭터가 존재하므로 닉네임 사용 불가
+        } catch (e) {
+          console.error(`Failed to parse JSON response: ${e}`);
+          return "error";
         }
       } else if (response.status === 404) {
-        // 캐릭터를 찾을 수 없음 - 닉네임 사용 가능
+        // 404는 캐릭터를 찾을 수 없음 - 닉네임 사용 가능
         console.log(`Character not found for ${nickname} - free`);
         return "free";
       } else if (response.status === 400) {
         // Bad Request - 유효하지 않은 요청 파라미터 등
-        const errorText = await response.text();
-        console.error(`Bad Request for ${nickname}: ${errorText}`);
+        console.error(`Bad Request for ${nickname}: ${responseBody}`);
+        
         // 에러 코드에 따라 처리
-        if (errorText.includes('OPENAPI00005')) {
+        if (responseBody.includes('OPENAPI00005')) {
           console.error(`Invalid API key for ${nickname}`);
-        } else if (errorText.includes('OPENAPI00004')) {
+        } else if (responseBody.includes('OPENAPI00004')) {
           console.error(`Invalid parameter for ${nickname}`);
         }
         return "error";
@@ -57,8 +75,7 @@ async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetri
         continue;
       } else {
         // 기타 오류
-        const errorText = await response.text();
-        console.error(`API error for ${nickname}: ${response.status} ${response.statusText} - ${errorText}`);
+        console.error(`API error for ${nickname}: ${response.status} ${response.statusText} - ${responseBody}`);
         return "error";
       }
     } catch (error) {
@@ -75,17 +92,29 @@ async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetri
   return "error";
 }
 
-// Nexon API key - 최신 API 키로 업데이트 (2025.07.17 기준)
-// 참고: 현재 테스트 키를 사용 중입니다. 실제 프로덕션에서는 유효한 API 키로 교체해야 합니다.
-// 현재 키가 유효하지 않거나 테스트용이면, 모의 데이터를 반환합니다.
-const NEXON_API_KEY = "test_95b81f8a40b7479fab6776cbb12d379f3e0937352b68c7f95bdebe2a4361e2a8efe8d04e6d233bd35cf2fabdeb93fb0d";
+// Nexon API key - 실제 API 키로 업데이트 (2025.07.17 기준)
+// API 키는 넥슨 개발자 센터(https://openapi.nexon.com/)에서 발급받았습니다.
+// 현재 사용 중인 API 키는 라이브 키입니다.
+const NEXON_API_KEY = "live_95b81f8a40b7479fab6776cbb12d379f122b76a2094b003cd691160e3c7956ccefe8d04e6d233bd35cf2fabdeb93fb0d";
 
-// 일부 환경에서 실제 API 호출이 가능한지 확인하는 플래그
-// 테스트 키에서 실제 API로 전환할 때 이 값을 true로 설정하세요.
+// API 사용 방식 설정
+// false: 항상 모의 데이터 사용 (테스트 모드)
+// true: 항상 실제 API 호출 (라이브 모드)
 const USE_REAL_API = true;
+
+// 넥슨 API를 사용할 수 있는지 여부를 확인 (테스트 키 체크)
+// 테스트 키는 "test_"로 시작하고, 라이브 키는 "live_"로 시작합니다
+const isTestKey = NEXON_API_KEY.startsWith("test_");
+const isLiveKey = NEXON_API_KEY.startsWith("live_");
 
 // Mock availability check when API has issues
 function mockAvailabilityCheck(nickname: string): "free" | "busy" {
+  // 메이플스토리에서는 한 글자 닉네임이 존재하지 않음
+  if (nickname.length < 2) {
+    console.log(`Mock check: ${nickname} is too short (minimum 2 characters required)`);
+    return "busy"; // 사용 불가로 처리
+  }
+  
   // 닉네임 해시 생성 (동일 닉네임이라도 시간에 따라 다른 결과가 나오도록)
   const timeHash = Math.floor(Date.now() / (1000 * 60 * 5)); // 5분마다 변경
   const nicknameHash = nickname.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -237,9 +266,10 @@ export const handler: Handler = async (event, context) => {
     
     let status: "free" | "busy" | "error";
     
-    // 실제 API 사용 여부 확인
-    if (USE_REAL_API && !apiKey.startsWith('test_')) {
-      // 실제 Nexon API 사용
+    // API 사용 설정에 따라 처리
+    if (USE_REAL_API && isLiveKey) {
+      // 실제 라이브 Nexon API 사용
+      console.log(`Using LIVE Nexon API for ${nickname} with key starting with: ${apiKey.substring(0, 10)}...`);
       try {
         status = await checkNicknameWithRetry(nickname, apiKey);
         console.log(`Nexon API result for ${nickname}: ${status}`);
@@ -255,8 +285,14 @@ export const handler: Handler = async (event, context) => {
         console.log(`Mock result for ${nickname}: ${status}`);
       }
     } else {
-      // 테스트 키나 API 비활성화 상태에서는 항상 모의 데이터 사용
-      console.log('Using mock data (test API key or API disabled)');
+      // 테스트 키 또는 API 비활성화 상태
+      if (isTestKey) {
+        console.log(`Using mock data (TEST API key: ${apiKey.substring(0, 10)}...)`);
+      } else if (!isLiveKey) {
+        console.log(`Using mock data (INVALID API key format: ${apiKey.substring(0, 10)}...)`);
+      } else {
+        console.log('Using mock data (API disabled)');
+      }
       status = mockAvailabilityCheck(nickname);
       console.log(`Mock result for ${nickname}: ${status}`);
     }

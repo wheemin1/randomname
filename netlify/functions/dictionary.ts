@@ -16,6 +16,10 @@ interface DictionaryResponse {
     num: number;
     item?: DictionaryItem[];
   };
+  error?: {
+    error_code: string;
+    message: string;
+  };
 }
 
 interface DictionaryItem {
@@ -91,14 +95,33 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
           url.searchParams.set("type2", "native,chinese"); // 고유어 + 한자어
         }
         
-        const response = await fetch(url.toString());
+        const response = await fetch(url.toString(), {
+          headers: {
+            'User-Agent': 'MapleNicknameGenerator/1.0'
+          }
+        });
         
         if (!response.ok) {
-          console.error(`Dictionary API error: ${response.status}`);
+          console.error(`Dictionary API error: ${response.status} ${response.statusText}`);
           continue;
         }
         
-        const data: DictionaryResponse = await response.json();
+        const text = await response.text();
+        let data: DictionaryResponse;
+        
+        try {
+          data = JSON.parse(text);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Response text:', text.substring(0, 500));
+          continue;
+        }
+        
+        // Check if response contains error
+        if (data.error) {
+          console.error(`Dictionary API error: ${data.error.error_code} - ${data.error.message}`);
+          continue;
+        }
         
         if (data.channel?.item) {
           for (const item of data.channel.item) {

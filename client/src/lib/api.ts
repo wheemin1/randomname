@@ -27,10 +27,15 @@ export const nicknameApi = {
       nicknames.map(async (nickname) => {
         try {
           const response = await fetch(`/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
           const data = await response.json();
           return {
             nickname,
-            status: data.status,
+            status: data.status || "error",
             lastChecked: data.timestamp || new Date().toISOString()
           };
         } catch (error) {
@@ -62,8 +67,14 @@ export const externalApi = {
   async checkNicknameAvailability(nickname: string): Promise<"free" | "busy" | "error"> {
     try {
       const res = await fetch(`/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`);
+      
+      if (!res.ok) {
+        console.error(`HTTP ${res.status}: ${res.statusText}`);
+        return "error";
+      }
+      
       const data = await res.json();
-      return data.status;
+      return data.status || "error";
     } catch (error) {
       console.error("External nickname check error:", error);
       return "error";
@@ -83,6 +94,12 @@ export const externalApi = {
       });
       
       const res = await fetch(`/.netlify/functions/dictionary?${queryParams}`);
+      
+      if (!res.ok) {
+        console.error(`Dictionary API HTTP ${res.status}: ${res.statusText}`);
+        return [];
+      }
+      
       const data = await res.json();
       return data.words || [];
     } catch (error) {

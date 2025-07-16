@@ -48,7 +48,7 @@ export function NicknameChip({
       case "loading":
         return "확인 중";
       case "error":
-        return "오류";
+        return "확인 불가";
       default:
         return "알 수 없음";
     }
@@ -62,7 +62,7 @@ export function NicknameChip({
           status === "free" && "bg-green-500",
           status === "busy" && "bg-red-500",
           status === "loading" && "bg-yellow-500 animate-pulse",
-          status === "error" && "bg-gray-500"
+          status === "error" && "bg-blue-500"
         )} />
         <span className="font-medium text-gray-900">{nickname}</span>
         <span className="text-sm text-gray-500">{length}글자</span>

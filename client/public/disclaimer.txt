@@ -1,0 +1,3 @@
+Data based on NEXON Open API
+
+이 서비스에서 제공되는 모든 캐릭터 데이터 및 닉네임 검증 정보는 NEXON Open API를 통해 제공받은 데이터를 기반으로 합니다.

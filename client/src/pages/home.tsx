@@ -30,7 +30,7 @@ export default function Home() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
               <img 
-                src="https://images.unsplash.com/photo-1505142468610-359e7d316be0?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=48&h=48" 
+                src="/favicon.png" 
                 alt="MapleStory Logo" 
                 className="w-8 h-8 rounded-lg"
               />
@@ -109,6 +109,11 @@ export default function Home() {
           </div>
         </div>
       )}
+      
+      {/* Nexon API Attribution */}
+      <footer className="bg-gray-800 text-white py-2 text-center text-xs">
+        <p>Data based on NEXON Open API</p>
+      </footer>
     </div>
   );
 }

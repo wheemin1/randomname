@@ -1,0 +1,133 @@
+## 📑 국립국어원 표준국어대사전 API – 닉네임 “실제 단어” 생성을 위한 핵심 정리
+
+> ⚡ 목표: 글자 2 \~ 6자의 **실존 단어**를 빠르게 뽑아와 닉네임 후보로 제시
+> → 필터·파라미터·쿼터·에러 처리 등 **“필요한 것만”** 모아뒀습니다.
+
+---
+
+### 1. 필수 / 자주 쓰는 요청 파라미터
+
+| 목적           | 파라미터         | 값 예시                    | 메모                         |
+| ------------ | ------------ | ----------------------- | -------------------------- |
+| **인증**       | `key`        | `32byteHex…`            | Netlify env 변수에 저장         |
+| **검색어**      | `q`          | `루*`, `가?` …            | *필수*. `method`에 따라 패턴 해석   |
+| **응답 형식**    | `req_type`   | `json`                  | 생략 시 XML                   |
+| **페이지네이션**   | `start`      | `1` \~ `1000`           | 1‑based                    |
+| 〃            | `num`        | `10` \~ `100`           | 한 번에 최대 100개               |
+| **고급 필터 ON** | `advanced`   | `y`                     | 길이·품사 등 세부 필터를 쓰려면 반드시 `y` |
+| **음절 길이**    | `letter_s/e` | `2` / `2`               | “정확히 2글자” ⇒ 둘 다 2          |
+| **언어계열**     | `type2`      | `native` / `loanword` … | 고유어·외래어 선택                 |
+| **품사**       | `pos`        | `1` (=명사)               | 닉네임용: 명사 또는 0 전체           |
+| **검색 방식**    | `method`     | `start` / `wildcard` …  | 시작음/와일드카드 매칭               |
+| **찾을 대상**    | `target`     | `1` (=표제어)              | 대부분 고정                     |
+
+> 🔹 **패턴 없이 “모든 2글자 고유어”만 뽑고 싶을 때**
+> `q=*`, `method=wildcard`, `advanced=y`, `letter_s=2`, `letter_e=2`, `type2=native`, `num=100`
+
+---
+
+### 2. 샘플 호출 URL
+
+```text
+GET https://stdict.korean.go.kr/api/search.do
+    ?key=${API_KEY}
+    &q=*
+    &req_type=json
+    &method=wildcard
+    &advanced=y
+    &letter_s=2
+    &letter_e=2
+    &type2=native
+    &pos=1
+    &num=100
+```
+
+**응답(JSON) 경로**
+
+```jsonc
+{
+  "channel": {
+    "total": 1284,
+    "item": [
+      { "word": "바다", ... },
+      { "word": "하늘", ... }
+    ]
+  }
+}
+```
+
+---
+
+### 3. Netlify Function 핵심 로직 (요약)
+
+```js
+export default async (req, res) => {
+  const { len = 2, lang = "native", start = 1 } = req.query;
+
+  const url = new URL("https://stdict.korean.go.kr/api/search.do");
+  const p = url.searchParams;
+  p.set("key", process.env.DIC_KEY);
+  p.set("q", "*");
+  p.set("req_type", "json");
+  p.set("method", "wildcard");
+  p.set("advanced", "y");
+  p.set("letter_s", len);
+  p.set("letter_e", len);
+  p.set("type2", lang);          // native | chinese | loanword
+  p.set("pos", "1");             // 명사
+  p.set("num", "100");
+  p.set("start", start);
+
+  const dict = await fetch(url).then(r => r.json());
+  const words = dict.channel?.item?.map(i => i.word) || [];
+
+  // 12h Edge‑cache (pseudo helper)
+  await res.edgeCache(60 * 60 * 12).json(words);
+};
+```
+
+---
+
+### 4. 쿼터 · 성능 최적화
+
+| 항목           | 기본값      | 권장 대처                                                 |
+| ------------ | -------- | ----------------------------------------------------- |
+| **일일 호출**    | 10 k req | ❶ Netlify Edge‑Cache 12 h<br>❷ 정적 스냅샷 미리 빌드           |
+| **응답 건수**    | 100/page | 여러 글자수·언어 조합을 **빌드 타임 ETL**로 JSON 저장 → 초기 로드 < 100 KB |
+| **지연(CORS)** | 브라우저 차단  | 반드시 **Functions 프록시** 사용                              |
+
+---
+
+### 5. UI 옵션 매핑
+
+| UI 체크박스    | API 파라미터                       |
+| ---------- | ------------------------------ |
+| 글자수 = N    | `letter_s=N`, `letter_e=N`     |
+| 순우리말만      | `type2=native`                 |
+| 받침 제외      | 프런트에서 후처리(`!hasBatchim(word)`) |
+| 특정 초성으로 시작 | `q=ㄹ*`, `method=start`         |
+
+---
+
+### 6. 에러 처리 루틴
+
+| 코드           | 의미        | UX 처치                                   |
+| ------------ | --------- | --------------------------------------- |
+| **020/021**  | 미등록·중지된 키 | “사전 API 키 오류 – 관리자에게 문의”                |
+| **100\~217** | 잘못된 파라미터  | 콘솔 로깅 후 Toast “옵션 값을 확인해 주세요”           |
+| **000**      | 시스템 에러    | 1) 최대 3회 재시도<br>2) 실패 시 로컬 스냅샷 fallback |
+
+---
+
+### 7. 통합 체크리스트
+
+* [ ] **API Key** `DIC_KEY` Netlify env 등록
+* [ ] `/dict` Function + 12 h Edge‑Cache 구현
+* [ ] GenerateModal > “실제 단어 사용” 토글 → `lang` 매핑
+* [ ] 길이·받침·초성 필터 모두 반영된 **후처리 util** 완성
+* [ ] Sentry or Logtail 로 API 에러 모니터링
+* [ ] 일일 호출 >  5 k 예상 시 **주간 스냅샷 빌드** CI 파이프라인 준비
+
+---
+
+필요하면 **전체 Netlify Functions 코드**, **ETL 스크립트**, **React GenerateModal 구현**을 이어서 작성해 드릴게요. 추가 요청만 알려주세요!

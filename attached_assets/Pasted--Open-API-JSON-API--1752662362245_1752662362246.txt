@@ -1,0 +1,110 @@
+### 📝 국립국어원 표준국어대사전(Open API) 활용 방안
+
+> “**실제 단어만 생성**” 옵션을 *정적 JSON 사전* 대신 **표준국어대사전 API**로 실시간 조회·필터링하는 설계를 정리했습니다.
+> *(API 사양은 공공데이터포털 등록 버전 기준 · 세부 파라미터는 변동 가능성이 있으니 발급 뒤 문서로 최종 확인하세요.)*
+
+---
+
+## 1. API 개요 (요약)
+
+| 항목          | 값/설명                                                                                                     |
+| ----------- | -------------------------------------------------------------------------------------------------------- |
+| **신청 위치**   | [https://stdict.korean.go.kr/openapi/openApiInfo.do](https://stdict.korean.go.kr/openapi/openApiInfo.do) |
+| **인증 방식**   | `certkey_no`(번호) + `key`(인증키, 32 byte)                                                                   |
+| **엔드포인트**   | `https://stdict.korean.go.kr/api/search.do`                                                              |
+| **주요 파라미터** | `q`(검색어) · `req_type=json` · `part=word` · `sort=dict` 등                                                 |
+| **응답 형식**   | XML (default) 또는 JSON (`req_type=json`)                                                                  |
+| **쿼터**      | 1 일 10 k 요청 (공공데이터포털 기본)                                                                                 |
+| **CORS**    | **없음** → 브라우저 직호출 불가 ⇒ Netlify Functions 프록시 필요                                                          |
+
+---
+
+## 2. 통합 시나리오 A – “온디맨드 단어 생성” (프런트 실시간 호출)
+
+| 단계                             | 설명                                             | 구현 포인트                           |
+| ------------------------------ | ---------------------------------------------- | -------------------------------- |
+| ① **프런트 → `/dict`**            | 글자수 `len=2`, 포맷 `pure`                         | Debounce (200 ms)                |
+| ② **Netlify Function `/dict`** | 대사전 API 호출 → 결과 파싱                             | - Key 헤더 삽입<br>- 12 h Edge Cache |
+| ③ **프런트**                      | 응답에서 `word` 배열 추출 → 랜덤 10개 → `/proxy` 로 가용성 검사 | 상태별 렌더                           |
+
+### `netlify/functions/dict.js` (의식적 축약 30줄)
+
+```js
+export default async (req, res) => {
+  const len   = req.query.len || 2;          // 2~6
+  const pure  = req.query.pure === "1";      // 순우리말만?
+  const q     = req.query.q || "";           // 초성·패턴 검색용
+
+  // 1) 대사전 API URL
+  const url = new URL("https://stdict.korean.go.kr/api/search.do");
+  url.searchParams.set("key", process.env.DIC_KEY);
+  url.searchParams.set("certkey_no", process.env.CERT_NO);
+  url.searchParams.set("part", "word");
+  url.searchParams.set("req_type", "json");
+  url.searchParams.set("q", q || "_");       // '_' 로 전체 램덤 반환 (비공식 트릭)
+  url.searchParams.set("sort", "dict");
+
+  // 2) 캐시 키
+  const cacheKey = `dict:${len}:${pure}:${q}`;
+  const cached = await res.cache(cacheKey);      // Netlify Edge cache helper
+  if (cached) return res.json(cached);
+
+  // 3) 호출 & 필터
+  const raw = await fetch(url.toString()).then(r => r.json());
+  let items = (raw.channel?.item || []).map(i => i.word);
+  items = items
+    .filter(w => w.length === +len)
+    .filter(w => !pure || !/[ᆨ-ᇂ]/u.test(w));   // 종성 유니코드 있으면 제외
+  await res.cachePut(cacheKey, items, 60 * 60 * 12);
+  return res.json(items.slice(0, 1000));         // 최대 1k 반환
+};
+```
+
+> **장점**: 최신 사전 반영, 초기 데이터 다운로드 0 KB
+> **단점**: API 쿼터(10k/일) 소진 시 실시간 생성 불가
+
+---
+
+## 3. 통합 시나리오 B – “사전 스냅샷 + Edge Cache” (ETL 미리 빌드)
+
+1. **Node 스크립트**(`scripts/build-dict.js`)
+
+   * 글자수 2 \~ 6 × 순우리말/전체 각 1회씩 API 크롤 → dedup·정제
+   * 결과를 `/public/dict/ko2.json` 등으로 저장
+2. **Netlify Build Hook**에서 스크립트 실행 → 정적 파일 업로드
+3. **프런트**는 CDN에서 JSON 로드 → 로컬 필터링
+
+> **장점**: 쿼터 걱정 0, 응답 < 5 ms
+> **단점**: 어휘 최신화 주기 (예: 주 1 회 CI) 필요
+
+---
+
+## 4. 선택 가이드
+
+| 조건               | 권장 방식                           |
+| ---------------- | ------------------------------- |
+| 트래픽 적고 “실시간” 중요  | **시나리오 A** (온디맨드)               |
+| 대량 사용자·낮은 지연이 우선 | **시나리오 B** (스냅샷)                |
+| 하이브리드 가능         | 평소 B, 캐시 MISS 시 A 호출 후 Edge Put |
+
+---
+
+## 5. UI/UX 반영 포인트
+
+| 위치                        | 설명                                             |
+| ------------------------- | ---------------------------------------------- |
+| **GenerateModal > 고급 옵션** | `실제 단어 사용` ON → “한국어 사전(온라인)” · “오프라인 스냅샷” 라디오 |
+| **로딩 상태**                 | 사전 API 호출 시 `Skeleton` 표시 + “사전에서 단어를 불러오는 중…” |
+| **API 오류(429/5xx)**       | “사전 호출이 지연됩니다. 저장된 사전을 사용할까요?” 알림 + fallback B |
+
+---
+
+## 6. TODO 요약
+
+* [ ] 국립국어원 API Key 발급 (`certkey_no`, `key`)
+* [ ] Netlify 환경변수 등록
+* [ ] `/dict` 프록시 Function 구현 & Edge Cache 적용
+* [ ] GenerateModal → `useRealWord` 옵션에 API 모드 추가
+* [ ] 사전 스냅샷 빌드 스크립트(optional) + GitHub Actions CRON
+
+궁금한 파라미터나 샘플 응답(JSON/XML) 구조를 알려주시면, **정규식 → 파싱 util**, **ETL 코드**, **TypeScript 타입**까지 바로 작성해 드리겠습니다!

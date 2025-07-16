@@ -20,15 +20,49 @@ export function useNicknameGeneration() {
         // Get real words from dictionary
         try {
           console.log('Fetching real words from dictionary...');
-          const words = await externalApi.getDictionaryWords({
-            length,
-            type: wordType,
-            count: count * 3, // Get more to filter
-          });
           
-          console.log(`Received ${words.length} words from API:`, words.slice(0, 10));
+          // 매번 다른 결과를 얻기 위해 여러 번 요청하여 다양한 단어 확보
+          const promises = [];
+          // 요청 횟수를 랜덤하게 결정 (3~5회)
+          const requestCount = Math.floor(Math.random() * 3) + 3;
           
-          candidates = koreanUtils.filterWords(words, {
+          for (let i = 0; i < requestCount; i++) {
+            // 각 요청마다 살짝 다른 매개변수 사용
+            const adjustedCount = count * (1 + Math.random() * 0.5); // 요청 크기 변동
+            
+            promises.push(
+              externalApi.getDictionaryWords({
+                length,
+                type: wordType,
+                count: Math.floor(adjustedCount), // 요청마다 다른 크기
+              })
+            );
+            
+            // 각 요청 사이에 약간의 지연 추가
+            if (i < requestCount - 1) {
+              await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 40)); // 30~70ms 지연
+            }
+          }
+          
+          // 모든 요청의 결과 병렬로 처리
+          const results = await Promise.all(promises);
+          
+          // 모든 결과 합치기
+          const allWords = results.flat();
+          
+          // 중복 제거
+          const uniqueWordsSet = new Set(allWords);
+          const uniqueWords = Array.from(uniqueWordsSet);
+          
+          console.log(`Received total ${uniqueWords.length} unique words from API:`, uniqueWords.slice(0, 10));
+          
+          // 랜덤하게 섞기 (Fisher-Yates 알고리즘)
+          for (let i = uniqueWords.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [uniqueWords[i], uniqueWords[j]] = [uniqueWords[j], uniqueWords[i]];
+          }
+          
+          candidates = koreanUtils.filterWords(uniqueWords, {
             excludeFinalConsonants,
             specificInitial,
           });

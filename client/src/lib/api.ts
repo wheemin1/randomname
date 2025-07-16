@@ -107,6 +107,7 @@ export const externalApi = {
         length: params.length.toString(),
         type: params.type,
         count: (params.count || 100).toString(),
+        _t: Date.now().toString() + Math.random().toString(36).substring(2, 15) + '-' + new Date().getMilliseconds(), // 캐싱 방지를 위한 완전 무작위 값
       });
       
       const url = `/.netlify/functions/dictionary?${queryParams}`;

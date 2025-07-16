@@ -8,12 +8,16 @@ async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetri
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const url = `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(nickname)}`;
+      // 닉네임을 UTF-8로 정확하게 인코딩
+      const encodedName = encodeURIComponent(nickname);
+      const url = `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodedName}`;
       console.log(`Attempt ${attempt + 1} for ${nickname}: ${url}`);
       
       const response = await fetch(url, {
         headers: {
-          'x-nxopen-api-key': apiKey, // 정확한 헤더 이름으로 변경 (대소문자 구분)
+          'x-nxopen-api-key': apiKey,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
       });
 
@@ -22,8 +26,14 @@ async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetri
       if (response.status === 200) {
         const data = await response.json();
         console.log(`Response data for ${nickname}:`, data);
-        // 넥슨 API 응답 형식에 따라 ocid가 있으면 사용 중, 없으면 사용 가능
-        return data.ocid ? "busy" : "free";
+        // ocid가 있으면 캐릭터가 존재함 - 닉네임 사용 중
+        if (data.ocid) {
+          console.log(`Character exists for ${nickname}, ocid: ${data.ocid}`);
+          return "busy";
+        } else {
+          console.log(`No ocid found for ${nickname} - free`);
+          return "free";
+        }
       } else if (response.status === 404) {
         // 캐릭터를 찾을 수 없음 - 닉네임 사용 가능
         console.log(`Character not found for ${nickname} - free`);

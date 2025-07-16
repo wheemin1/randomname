@@ -30,15 +30,6 @@ interface DictionaryItem {
   };
 }
 
-// Sample Korean words for fallback
-const sampleKoreanWords = {
-  2: ["하늘", "바다", "산", "강", "달", "별", "해", "구름", "비", "눈", "꽃", "나무", "새", "물", "불", "땅", "돌", "흙", "잎", "열매"],
-  3: ["하늘빛", "바다색", "산새", "강물", "달빛", "별빛", "해님", "구름이", "비둘기", "눈사람", "꽃잎", "나무꾼", "새벽", "물고기", "불빛", "땅콩", "돌멩이", "흙길", "잎사귀", "열매즙"],
-  4: ["하늘나라", "바다거품", "산속길", "강가에서", "달무리", "별자리", "해바라기", "구름다리", "비오는날", "눈꽃송이", "꽃다발", "나무그늘", "새소리", "물방울", "불꽃놀이", "땅속으로", "돌아가자", "흙냄새", "잎새소리", "열매향기"],
-  5: ["하늘공원에서", "바다냄새나는", "산속오두막", "강변풍경", "달빛속에서", "별빛처럼", "해바라기꽃", "구름위에서", "비오는오후", "눈사람만들기", "꽃밭에서", "나무아래에서", "새벽공기", "물속여행", "불빛축제", "땅속보물", "돌담길따라", "흙손으로", "잎사귀춤", "열매따기"],
-  6: ["하늘색바다에서", "바다거품냄새", "산속작은집", "강변산책길", "달빛아래에서", "별빛가득한", "해바라기밭에서", "구름사이로", "비오는날풍경", "눈꽃송이춤", "꽃잎하나하나", "나무그늘아래", "새소리가득한", "물방울반짝", "불꽃놀이축제", "땅속깊은곳", "돌아가는길", "흙냄새가득", "잎새바람소리", "열매향기진한"],
-};
-
 // Sample English words for fallback
 const sampleEnglishWords = {
   2: ["sky", "sea", "sun", "moon", "star", "tree", "bird", "fish", "fire", "wind", "rain", "snow", "rock", "leaf", "rose", "blue", "red", "gold", "ice", "gem"],
@@ -48,9 +39,6 @@ const sampleEnglishWords = {
   6: ["azured", "oceanic", "sunlit", "moonlit", "starlit", "wooded", "birdie", "aquatic", "flamed", "breezy", "rainy", "snowy", "rocky", "leafy", "rosy", "blued", "ruby", "golden", "frosty", "jeweled"],
 };
 
-/**
- * 국립국어원 표준국어대사전 API를 통해 단어 가져오기
- */
 async function fetchFromDictionaryAPI(length: number, type: string): Promise<string[]> {
   // For english words, return sample data
   if (type === "english") {
@@ -58,26 +46,29 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
     return words;
   }
 
-  // For Korean words, try to use the actual dictionary API
+  // For Korean words, use the actual dictionary API
   try {
     const words: string[] = [];
+    let start = 1;
     const maxResults = 500; // Get more results to filter by length
     
     // Common Korean syllables and particles to search for words
     const searchTerms = [
       "가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파", "하",
       "게", "네", "데", "레", "메", "베", "세", "에", "제", "체", "케", "테", "페", "헤",
-      "고", "노", "도", "로", "모", "보", "소", "오", "조", "초", "코", "토", "포", "호"
+      "고", "노", "도", "로", "모", "보", "소", "오", "조", "초", "코", "토", "포", "호",
+      "구", "누", "두", "루", "무", "부", "수", "우", "주", "추", "쿠", "투", "푸", "후",
+      "그", "느", "드", "르", "므", "브", "스", "으", "즈", "츠", "크", "트", "프", "흐"
     ];
     
     // Get words from multiple search terms
-    for (const term of searchTerms.slice(0, 5)) { // Limit to first 5 terms to avoid rate limits
+    for (const term of searchTerms.slice(0, 10)) { // Limit to first 10 terms
       try {
         const url = new URL(DICTIONARY_API_BASE_URL);
         url.searchParams.set("key", DICTIONARY_API_KEY);
         url.searchParams.set("q", term);
         url.searchParams.set("req_type", "json");
-        url.searchParams.set("start", "1");
+        url.searchParams.set("start", start.toString());
         url.searchParams.set("num", "100");
         url.searchParams.set("advanced", "y");
         url.searchParams.set("method", "start");
@@ -115,18 +106,12 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         if (words.length >= maxResults) break;
         
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 100));
         
       } catch (error) {
         console.error(`Error fetching from dictionary API with term ${term}:`, error);
         continue;
       }
-    }
-    
-    // If we couldn't get enough words from the API, use sample data
-    if (words.length < 10) {
-      console.warn(`Not enough words found via API (${words.length}), using sample data`);
-      return sampleKoreanWords[length as keyof typeof sampleKoreanWords] || [];
     }
     
     // Remove duplicates and return
@@ -135,10 +120,8 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
     
   } catch (error) {
     console.error("Dictionary API error:", error);
-    // Fallback to sample data
-    return type === "pure" || type === "korean" 
-      ? sampleKoreanWords[length as keyof typeof sampleKoreanWords] || []
-      : [];
+    // Return empty array if API fails
+    return [];
   }
 }
 
@@ -216,7 +199,6 @@ export const handler: Handler = async (event, context) => {
         returned: limited.length,
         length,
         type,
-        timestamp: new Date().toISOString(),
       }),
     };
   } catch (error) {
@@ -228,6 +210,21 @@ export const handler: Handler = async (event, context) => {
         error: 'Failed to fetch dictionary words',
         message: error instanceof Error ? error.message : 'Unknown error'
       }),
+    };
+  }
+};
+        length,
+        type,
+        count: limited.length,
+        timestamp: new Date().toISOString(),
+      }),
+    };
+  } catch (error) {
+    console.error('Dictionary API error:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
 };

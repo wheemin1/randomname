@@ -56,9 +56,12 @@ const sampleEnglishWords = {
  * 국립국어원 표준국어대사전 API를 통해 단어 가져오기
  */
 async function fetchFromDictionaryAPI(length: number, type: string): Promise<string[]> {
+  console.log(`Fetching dictionary words: length=${length}, type=${type}`);
+  
   // For english words, return sample data
   if (type === "english") {
     const words = sampleEnglishWords[length as keyof typeof sampleEnglishWords] || [];
+    console.log(`Returning ${words.length} English words`);
     return words;
   }
 
@@ -73,6 +76,8 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
       "게", "네", "데", "레", "메", "베", "세", "에", "제", "체", "케", "테", "페", "헤",
       "고", "노", "도", "로", "모", "보", "소", "오", "조", "초", "코", "토", "포", "호"
     ];
+    
+    console.log(`Searching with ${searchTerms.length} terms, using first 5`);
     
     // Get words from multiple search terms
     for (const term of searchTerms.slice(0, 5)) { // Limit to first 5 terms to avoid rate limits
@@ -95,6 +100,8 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
           url.searchParams.set("type2", "native,chinese"); // 고유어 + 한자어
         }
         
+        console.log(`Fetching from dictionary API: ${url.toString()}`);
+        
         const response = await fetch(url.toString(), {
           headers: {
             'User-Agent': 'MapleNicknameGenerator/1.0'
@@ -107,6 +114,9 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         }
         
         const text = await response.text();
+        console.log(`Dictionary response length: ${text.length}`);
+        console.log(`Dictionary response preview: ${text.substring(0, 200)}...`);
+        
         let data: DictionaryResponse;
         
         try {
@@ -124,6 +134,7 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         }
         
         if (data.channel?.item) {
+          console.log(`Found ${data.channel.item.length} items for term "${term}"`);
           for (const item of data.channel.item) {
             if (item.word && item.word.length === length) {
               // Filter out words with numbers or special characters
@@ -132,6 +143,8 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
               }
             }
           }
+        } else {
+          console.log(`No items found for term "${term}"`);
         }
         
         // Break if we have enough words
@@ -146,6 +159,8 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
       }
     }
     
+    console.log(`Total words found: ${words.length}`);
+    
     // If we couldn't get enough words from the API, use sample data
     if (words.length < 10) {
       console.warn(`Not enough words found via API (${words.length}), using sample data`);
@@ -154,6 +169,7 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
     
     // Remove duplicates and return
     const uniqueWords = [...new Set(words)];
+    console.log(`Returning ${uniqueWords.length} unique words`);
     return uniqueWords;
     
   } catch (error) {

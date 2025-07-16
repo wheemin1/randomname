@@ -11,6 +11,7 @@ export function useNicknameGeneration() {
 
   const generateMutation = useMutation({
     mutationFn: async (options: GenerationOptions) => {
+      console.log('Starting nickname generation with options:', options);
       const { length, count, useRealWords, wordType, excludeFinalConsonants, specificInitial } = options;
 
       let candidates: string[] = [];
@@ -18,16 +19,21 @@ export function useNicknameGeneration() {
       if (useRealWords) {
         // Get real words from dictionary
         try {
+          console.log('Fetching real words from dictionary...');
           const words = await externalApi.getDictionaryWords({
             length,
             type: wordType,
             count: count * 3, // Get more to filter
           });
           
+          console.log(`Received ${words.length} words from API:`, words.slice(0, 10));
+          
           candidates = koreanUtils.filterWords(words, {
             excludeFinalConsonants,
             specificInitial,
           });
+          
+          console.log(`Filtered down to ${candidates.length} candidates:`, candidates.slice(0, 10));
         } catch (error) {
           console.error("Dictionary error:", error);
           toast({
@@ -40,6 +46,7 @@ export function useNicknameGeneration() {
 
       // If no real words or fallback to random
       if (candidates.length === 0) {
+        console.log('No candidates found, generating random nicknames...');
         candidates = Array.from({ length: count * 2 }, () => {
           let nickname = koreanUtils.generateRandomSyllables(length);
           
@@ -63,6 +70,8 @@ export function useNicknameGeneration() {
       // Shuffle and take requested count
       const shuffled = candidates.sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, count);
+      
+      console.log(`Selected ${selected.length} nicknames for availability check:`, selected);
 
       // Check availability for each generated nickname
       const results: GeneratedNickname[] = selected.map(nickname => ({
@@ -81,7 +90,9 @@ export function useNicknameGeneration() {
       // Check availability in background
       results.forEach(async (result, index) => {
         try {
+          console.log(`Checking availability for: ${result.nickname}`);
           const status = await externalApi.checkNicknameAvailability(result.nickname);
+          console.log(`Availability result for ${result.nickname}:`, status);
           
           setGeneratedNicknames(prev => 
             prev.map((item, i) => 

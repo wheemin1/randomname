@@ -22,17 +22,25 @@ export interface GenerateNicknamesRequest {
 
 export const nicknameApi = {
   async checkNicknames(nicknames: string[]): Promise<NicknameCheckResponse[]> {
+    console.log(`Checking ${nicknames.length} nicknames:`, nicknames);
+    
     // Use /.netlify/functions/ directly instead of /api/ path
     const results = await Promise.all(
       nicknames.map(async (nickname) => {
         try {
-          const response = await fetch(`/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`);
+          const url = `/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`;
+          console.log(`Checking nickname availability: ${url}`);
+          
+          const response = await fetch(url);
           
           if (!response.ok) {
+            console.error(`HTTP error for ${nickname}: ${response.status} ${response.statusText}`);
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           
           const data = await response.json();
+          console.log(`Response for ${nickname}:`, data);
+          
           return {
             nickname,
             status: data.status || "error",
@@ -48,6 +56,7 @@ export const nicknameApi = {
         }
       })
     );
+    console.log(`Check results:`, results);
     return results;
   },
 
@@ -66,7 +75,11 @@ export const nicknameApi = {
 export const externalApi = {
   async checkNicknameAvailability(nickname: string): Promise<"free" | "busy" | "error"> {
     try {
-      const res = await fetch(`/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`);
+      console.log(`Checking nickname availability: ${nickname}`);
+      const url = `/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`;
+      console.log(`Calling URL: ${url}`);
+      
+      const res = await fetch(url);
       
       if (!res.ok) {
         console.error(`HTTP ${res.status}: ${res.statusText}`);
@@ -74,6 +87,8 @@ export const externalApi = {
       }
       
       const data = await res.json();
+      console.log(`Availability response for ${nickname}:`, data);
+      
       return data.status || "error";
     } catch (error) {
       console.error("External nickname check error:", error);
@@ -87,13 +102,17 @@ export const externalApi = {
     count?: number;
   }): Promise<string[]> {
     try {
+      console.log(`Getting dictionary words:`, params);
       const queryParams = new URLSearchParams({
         length: params.length.toString(),
         type: params.type,
         count: (params.count || 100).toString(),
       });
       
-      const res = await fetch(`/.netlify/functions/dictionary?${queryParams}`);
+      const url = `/.netlify/functions/dictionary?${queryParams}`;
+      console.log(`Calling dictionary API: ${url}`);
+      
+      const res = await fetch(url);
       
       if (!res.ok) {
         console.error(`Dictionary API HTTP ${res.status}: ${res.statusText}`);
@@ -101,6 +120,8 @@ export const externalApi = {
       }
       
       const data = await res.json();
+      console.log(`Dictionary API response:`, data);
+      
       return data.words || [];
     } catch (error) {
       console.error("Dictionary API error:", error);

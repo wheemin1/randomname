@@ -4,29 +4,40 @@ import { Handler } from "@netlify/functions";
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetries = 3): Promise<"free" | "busy" | "error"> {
+  console.log(`Checking nickname: ${nickname}`);
+  
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(`https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(nickname)}`, {
+      const url = `https://open.api.nexon.com/maplestory/v1/id?character_name=${encodeURIComponent(nickname)}`;
+      console.log(`Attempt ${attempt + 1} for ${nickname}: ${url}`);
+      
+      const response = await fetch(url, {
         headers: {
           'X-NX-Open-API-Key': apiKey,
         },
       });
 
+      console.log(`Response status for ${nickname}: ${response.status}`);
+
       if (response.status === 200) {
         const data = await response.json();
+        console.log(`Response data for ${nickname}:`, data);
         // If ocid exists, nickname is busy
         return data.ocid ? "busy" : "free";
       } else if (response.status === 404) {
         // Character not found, nickname is free
+        console.log(`Character not found for ${nickname} - free`);
         return "free";
       } else if (response.status === 429) {
         // Rate limited, wait and retry
+        console.log(`Rate limited for ${nickname}, retrying...`);
         const waitTime = Math.min(1000 * Math.pow(2, attempt), 8000);
         await delay(waitTime);
         continue;
       } else {
         // Other error
-        console.error(`API error for ${nickname}: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`API error for ${nickname}: ${response.status} ${response.statusText} - ${errorText}`);
         return "error";
       }
     } catch (error) {

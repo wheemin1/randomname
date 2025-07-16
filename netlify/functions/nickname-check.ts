@@ -43,6 +43,9 @@ async function checkNicknameWithRetry(nickname: string, apiKey: string, maxRetri
   return "error";
 }
 
+// Nexon API key
+const NEXON_API_KEY = "test_95b81f8a40b7479fab6776cbb12d379f3e0937352b68c7f95bdebe2a4361e2a8efe8d04e6d233bd35cf2fabdeb93fb0d";
+
 export const handler: Handler = async (event, context) => {
   // Enable CORS
   const headers = {
@@ -68,7 +71,8 @@ export const handler: Handler = async (event, context) => {
     };
   }
 
-  const apiKey = process.env.NEXON_API_KEY || process.env.MAPLESTORY_API_KEY || "test_95b81f8a40b7479fab6776cbb12d379f3e0937352b68c7f95bdebe2a4361e2a8efe8d04e6d233bd35cf2fabdeb93fb0d";
+  // Use the defined API key constant
+  const apiKey = NEXON_API_KEY;
   
   if (!apiKey) {
     console.error('API key not found');

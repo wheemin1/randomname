@@ -4,3 +4,6 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+# Netlify 관련 설정 유지를 위해 제외하지 않음
+# /_redirects
+# /netlify.toml

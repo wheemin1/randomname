@@ -22,8 +22,28 @@ export interface GenerateNicknamesRequest {
 
 export const nicknameApi = {
   async checkNicknames(nicknames: string[]): Promise<NicknameCheckResponse[]> {
-    const res = await apiRequest("POST", "/api/nickname-check", { nicknames });
-    return res.json();
+    // Use /.netlify/functions/ directly instead of /api/ path
+    const results = await Promise.all(
+      nicknames.map(async (nickname) => {
+        try {
+          const response = await fetch(`/.netlify/functions/nickname-check?nickname=${encodeURIComponent(nickname)}`);
+          const data = await response.json();
+          return {
+            nickname,
+            status: data.status,
+            lastChecked: data.timestamp || new Date().toISOString()
+          };
+        } catch (error) {
+          console.error("Nickname check error:", error);
+          return {
+            nickname,
+            status: "error" as const,
+            lastChecked: new Date().toISOString()
+          };
+        }
+      })
+    );
+    return results;
   },
 
   async generateNicknames(params: GenerateNicknamesRequest) {

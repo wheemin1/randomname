@@ -16,7 +16,7 @@ export interface GenerationOptions {
 
 export interface SavedNickname {
   nickname: string;
-  status: "free" | "busy" | "error";
+  status: "free" | "busy" | "loading" | "error";
   savedAt: Date;
   length: number;
 }

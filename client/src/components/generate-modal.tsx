@@ -35,7 +35,9 @@ export function GenerateModal({ isOpen, onClose }: GenerateModalProps) {
     generateNicknames(options);
   };
 
-  const handleSave = (nickname: string, status: "free" | "busy" | "error") => {
+  const handleSave = (nickname: string, status: "free" | "busy" | "loading" | "error") => {
+    // Don't save nicknames that are still loading status
+    if (status === "loading") return;
     saveNickname(nickname, status, nickname.length);
   };
 
@@ -50,9 +52,12 @@ export function GenerateModal({ isOpen, onClose }: GenerateModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" aria-describedby="dialog-description">
         <DialogHeader>
           <DialogTitle>닉네임 생성하기</DialogTitle>
+          <p id="dialog-description" className="sr-only">
+            닉네임 생성 옵션을 설정하고 생성할 수 있습니다.
+          </p>
         </DialogHeader>
         
         <div className="space-y-6">

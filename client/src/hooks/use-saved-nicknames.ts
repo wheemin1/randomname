@@ -11,7 +11,10 @@ export function useSavedNicknames() {
     setSavedNicknames(localStorageUtils.getSavedNicknames());
   }, []);
 
-  const saveNickname = useCallback((nickname: string, status: "free" | "busy" | "error", length: number) => {
+  const saveNickname = useCallback((nickname: string, status: "free" | "busy" | "loading" | "error", length: number) => {
+    // Don't save nicknames with loading status
+    if (status === "loading") return;
+    
     const savedNickname: SavedNickname = {
       nickname,
       status,

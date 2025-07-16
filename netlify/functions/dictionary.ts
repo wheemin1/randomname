@@ -223,7 +223,7 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
     }
     
     // 더 많은 검색어를 사용하여 다양성 확보 (매번 다른 개수 사용)
-    const termCount = Math.floor(Math.random() * 20) + 20; // 20~40개 사이 랜덤
+    const termCount = Math.floor(Math.random() * 10) + 8; // 8~18개 사이 랜덤 (성능 최적화)
     const selectedTerms = shuffledTerms.slice(0, termCount);
     
     // Get words from multiple search terms
@@ -274,7 +274,7 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         
         // 국립국어원 API 호출
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃 (성능 최적화)
         
         const response = await fetch(url.toString(), {
           headers: {
@@ -335,7 +335,7 @@ async function fetchFromDictionaryAPI(length: number, type: string): Promise<str
         if (words.length >= maxResults) break;
         
         // Small delay to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 50)); // 50ms 지연 (성능 최적화)
         
       } catch (error) {
         console.error(`Error fetching from dictionary API with term ${term}:`, error);
